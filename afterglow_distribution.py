@@ -130,7 +130,7 @@ def get_params(n, save=False, filename=''):
     # list of dicts
     return params
 
-# note: changed to afterglow curves not Z
+# simulate one event
 def gen_event(params):
 
     kn_params, aft_params = params
@@ -151,9 +151,7 @@ def gen_event(params):
     mag_band_KN = KN.getAbsMagsInPassbands(sncosmo_bands)
     mag_band_KN = np.array([list(item) for item in mag_band_KN.values()])
 
-    # since each band is a row in the mag array, the y values are the bands (param help const thru row = y val)
-    #Z = mag_band_aftKN - mag_band_KN # magnitude enhancement, (11, 50)
-    return np.array([mag_band_aft, mag_band_aftKN, mag_band_KN]) # ()
+    return np.array([mag_band_aft, mag_band_aftKN, mag_band_KN]), np.array(params) #, kn_params, aft_params
 
 
 # issue with NaNs in UV: check and interpolate over them
@@ -174,7 +172,7 @@ def gen_events(n, save=False, filename=''):
         params = get_params(n, save, filename)
 
         with schwimmbad.JoblibPool(5) as pool:
-             values = np.array(pool.map(gen_event, params))
+             values = list(pool.map(gen_event, params))
 
         with open(f'data/sims/{n}_events_{filename}.pkl', 'wb') as f:
              pickle.dump(values, f)
@@ -189,11 +187,14 @@ def gen_events(n, save=False, filename=''):
 def plot(n, save, filename=''):
 
     # load them in
-    values = gen_events(n, save, filename) # shape 11, 50 (each row is an LC)
+    events = gen_events(n, save, filename) # shape 11, 50 (each row is an LC)
         # 10 events each with a Z, mag aftKN and KN
 
     # values is a 3d array each entry is an 2d grid of enhancements
+    values = np.array([a[0] for a in events]) # the first entry in all events is the mags
+
     distr = np.percentile(values[:,0], [16, 50, 84], axis=0)
+    distr_net = np.percentile(values[:,1], [16, 50, 84], axis=0)
 
     fig, axs = plt.subplots(int(len(sncosmo_bands)/2), 2, figsize=(12, 16))
     plt.subplots_adjust(wspace=0.2, hspace=0.6)
@@ -203,8 +204,11 @@ def plot(n, save, filename=''):
         ax = axs[idx]
         # plot distr 1 - median
         # fill btwn distr 0 and 2
-        ax.fill_between(phases, distr[0][idx, :], distr[2][idx, :], alpha=0.3)
-        ax.plot(phases, distr[1][idx, :])
+        ax.fill_between(phases, distr[0][idx, :], distr[2][idx, :], alpha=0.3, color='C0')
+        ax.plot(phases, distr[1][idx, :], color='C0')
+
+        ax.fill_between(phases, distr_net[0][idx, :], distr_net[2][idx, :], alpha=0.3, color='C1')
+        ax.plot(phases, distr_net[1][idx, :], color='C1')
 
         ax.set_xlabel('time (days)')    
         ax.set_ylabel(r'$\Delta M$')
@@ -549,13 +553,14 @@ if __name__ == '__main__':
 
     n = args.n_events
     n_files = 10
-    fname = 'All_noExt' #EK_aft'
+    fname = 'refactor'
     if not args.plot:
         i = args.iter
         print(i, flush=True)
         np.random.seed(2667 % i)
         fname += str(i)
         gen_events(n, save=True, filename=fname)
+
 
         # TODO: re-run param gen for Ek_aft
             # if params are the same, 
@@ -565,7 +570,7 @@ if __name__ == '__main__':
 
     if args.plot:
         merge(n, n_files=n_files, fname=fname)
-        #print('now plotting', flush=True)
+        print('now plotting', flush=True)
 
         # select bands for plotting
         # labels_idx = np.array([0, 1, 4, 5, 6, 7, 8, 9]) # UV + LSST
@@ -576,11 +581,11 @@ if __name__ == '__main__':
         matplotlib.rc('font', **font)
 
         # #compare_GW170817()
-        # #plot(n, save=False, filename=fname)
+        #plot(n, save=False, filename=fname)
         # #afterglows(n*n_files, save=False, filename=fname)
-        plot_avglc(n*n_files, save=False, filename=fname)
+        # plot_avglc(n*n_files, save=False, filename=fname)
         #plot_color(n, save=False, filename=fname)
-        plot_distance(n*n_files, save=False, filename=fname, limiting_mags=sncosmo_lim_mags)
+        #plot_distance(n*n_files, save=False, filename=fname, limiting_mags=sncosmo_lim_mags)
     # params = get_params(500, False, filename=fname)
     # values = gen_events(500, False, filename=fname)
 

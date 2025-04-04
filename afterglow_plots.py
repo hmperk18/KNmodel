@@ -45,7 +45,9 @@ def plot_appmag(n, save, filename, plotname, dist, limiting_mags):
 
     distmod = Distance(dist*u.Mpc).distmod.value
 
-    values = gen_events(n, save, filename) # shape n events, 3 LCs, 11, 50 (each row is an LC)
+    events = gen_events(n, save, filename) # shape n events, 3 LCs, 11, 50 (each row is an LC)
+    values = np.array([a[0] for a in events])
+
     distr = np.percentile(values[:,1], [16, 50, 84], axis=0) + distmod# get magAftKN
     distr_KN = np.percentile(values[:,2], [16, 50, 84], axis=0) + distmod
 
@@ -761,8 +763,8 @@ if __name__ == '__main__':
 
     n = args.n_events
     n_files = 10
-    fname = 'All' #'EK_nir' #'EK_red' #
-    plotname='poster'
+    fname = 'refactor' # 'All' #'EK_nir' #'EK_red' #
+    plotname=''
     # if not args.plot:
     #     i = args.iter
     #     print(i, flush=True)
@@ -773,22 +775,21 @@ if __name__ == '__main__':
     # plot_aft_varied(args.iter)
 
     if args.plot:
-        #merge(n, n_files=n_files, fname=fname)
         print('now plotting', flush=True)
 
         # select bands for plotting
-        #labels_idx = np.array([0, 1, 4, 5, 6, 7, 8, 9]) # UV + LSST
+        labels_idx = np.array([0, 1, 4, 5, 6, 7, 8, 9]) # UV + LSST
         # labels_idx = np.array([4,5])
         # labels_idx = np.arange(len(labels))
         # font = { 'size'   : 15}
         # mpl.rc('font', **font)
 
-        # plt_params = {'n': n*n_files, 'save':False, 'filename': fname, 'plotname':plotname}
+        plt_params = {'n': n*n_files, 'save':False, 'filename': fname, 'plotname':plotname}
         # plot_stratify(**plt_params)
         # plot_mag_scatter(**plt_params)
 
         #compare_GW170817()
-        labels_idx = np.array([4,5])
+        # labels_idx = np.array([4,5])
         plot_appmag(n*n_files, save=False, filename=fname, plotname=plotname+'_lsst', 
                             dist=160, limiting_mags=limiting_mags)
         # # plot_appmag_outlier(n*n_files, save=False, filename=fname, plotname=plotname, 
