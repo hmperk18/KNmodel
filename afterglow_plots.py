@@ -53,7 +53,7 @@ def plot_appmag(n, save, filename, plotname, dist, limiting_mags):
 
     # lsst bands
     n_plots = int(len(labels_idx)/2) + (len(labels_idx)%2)
-    fig, axs = plt.subplots(n_plots, 2, figsize=(2*7.4, 2*3.25)) # figsize=(12, 5*n_plots)
+    fig, axs = plt.subplots(n_plots, 2, figsize=(2*7.4, n_plots*2*3.25)) # figsize=(12, 5*n_plots)
     plt.subplots_adjust(wspace=0.2, hspace=0.6)
     axs = axs.ravel()
 

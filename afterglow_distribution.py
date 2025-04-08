@@ -238,6 +238,8 @@ def plot_avglc(n, save, filename='', log=False):
     values = gen_events(n, save, filename) # shape 11, 50 (each row is an LC)
         # 10 events each with a Z, mag aftKN and KN
     
+    values = np.array([v for v, p in values])
+
     # overlay GW170817 like event
         # at: Dietrich fit Fig 
     # ang = 0.03 # core = 0.07
@@ -394,9 +396,9 @@ def merge(n, n_files, fname):
     for f in val_files:
         with open(f, 'rb') as f:
             values = pickle.load(f)
-            values_arr.append(values)
+            values_arr += values
 
-    values = np.vstack(values_arr)
+    values = values_arr # bc params are in there 
     # print(values.shape, flush=True)
     with open(f'data/sims/{n*n_files}_events_{fname}.pkl', 'wb') as f:
         pickle.dump(values, f)
@@ -415,8 +417,8 @@ def merge(n, n_files, fname):
             pickle.dump(masses, f)
 
     # clean up
-    for f in val_files: # TODO: put back mass_files + param_files + 
-        os.remove(f)
+    # for f in val_files: # TODO: put back mass_files + param_files + 
+    #     os.remove(f)
 
 def compare_GW170817():
     ang = 0.03 # core = 0.07
@@ -580,10 +582,13 @@ if __name__ == '__main__':
                  'size'   : 15}
         matplotlib.rc('font', **font)
 
+        values = gen_events(n*n_files, save=False, filename=fname)
+        print(len(values), len(values[0]), flush=True)
+
         # #compare_GW170817()
         #plot(n, save=False, filename=fname)
         # #afterglows(n*n_files, save=False, filename=fname)
-        # plot_avglc(n*n_files, save=False, filename=fname)
+        plot_avglc(n*n_files, save=False, filename=fname)
         #plot_color(n, save=False, filename=fname)
         #plot_distance(n*n_files, save=False, filename=fname, limiting_mags=sncosmo_lim_mags)
     # params = get_params(500, False, filename=fname)

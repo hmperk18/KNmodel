@@ -313,10 +313,14 @@ def lum_func(n, filename, plotname='',
         M_KN = np.min(values[:, 2, b, :], axis=1)
         M_KN = M_KN[np.isfinite(M_KN)]
         M_aftonly = np.min(values[:, 0, b, :], axis=1)
-        M_aftonly = M_aftonly[np.isfinite(M_aftonly)]
 
         if i == 1:
-            bright_idx = np.where(M_aftonly < -20)[0]
+            mask = (M_aftonly < -20) & np.isfinite(M_aftonly)
+            bright_idx = np.where(mask)[0]
+
+        M_aftonly = M_aftonly[np.isfinite(M_aftonly)]
+
+        
         M_net = np.min(values[:, 1, b, :], axis=1)
         M_net = M_net[np.isfinite(M_net)]
 
@@ -326,7 +330,7 @@ def lum_func(n, filename, plotname='',
         bins=list(np.arange(min(data), max(data) + binwidth, binwidth))
         
         ax.hist(M_net, bins=bins, label='KN+afterglow')
-        ax.hist(M_aftonly, bins=bins, label='Afterglow')
+        ax.hist(M_aftonly, bins=bins, label='Afterglow', alpha=0.5)
         ax.hist(M_KN, bins=bins, label='Kilonova', alpha=0.5)
         ax.text(-22, 800, labels[b], va='center', ha='center')
         ax.tick_params(axis="x", which="both", top=True, labeltop=False, bottom=True, direction="in")
@@ -334,7 +338,7 @@ def lum_func(n, filename, plotname='',
 
         ax = axs[2*i + 1] # cumulative distr
         ax.hist(M_net, bins=bins, cumulative=True)
-        ax.hist(M_aftonly, bins=bins, cumulative=True)
+        ax.hist(M_aftonly, bins=bins, cumulative=True, alpha=0.5)
         ax.hist(M_KN, bins=bins, cumulative=True, alpha=0.5)
         ax.invert_xaxis()
         ax.tick_params(axis="x", which="both", top=True, labeltop=False, bottom=True, direction="in")
@@ -391,14 +395,20 @@ def lum_func(n, filename, plotname='',
     plt.subplots_adjust(hspace=0.4)
 
     params = np.array([a[1] for a in events])
-    params_bright = np.array([a[1] for a in events[bright_idx]])
 
-    M_aftonly = np.min(values[:, 0, 4, :], axis=1)
+    print(bright_idx, flush=True)
+    M_aftonly = np.min(values[:, 0, 5, :], axis=1)
+    print(len(M_aftonly), flush=True)
     M_aftonly = M_aftonly[np.isfinite(M_aftonly)]
-    print('bright u-band afterglows peaks')
+    print(len(M_aftonly), flush=True)
+    print('bright g-band afterglows peaks', flush=True)
     print(M_aftonly[bright_idx], flush=True)
+    params_bright = np.array([a[1] for a in [events[i] for i in bright_idx] ])
+
+
 
     legends = ['all events', 'bright']
+    bins = [0, ]*10
     for j, parms in enumerate([params.T, params_bright.T]):
         kn_p, aft_p = parms # [ [kn, aft], [kn, aft]] -> [[kn, kn], [aft, aft]]
 
@@ -430,21 +440,34 @@ def lum_func(n, filename, plotname='',
                 if key in aft_params.keys():
                     aft_params[key].append(value)
 
-        
         for i, (param, value) in enumerate(kn_params.items()):
-            axs[i].hist(value, bins=100, density=True, alpha=0.6, label=legends[j])
+
+            if j == 0:
+                _, b, _ = axs[i].hist(value, bins=100, density=True, alpha=0.6, label=legends[j])
+                bins[i]= b
+                print(b, flush=True)
+            else:
+                print(j, i, bins[i], flush=True)
+                axs[i].hist(value, bins=bins[i], density=True, alpha=0.6, label=legends[j])
+                if param == 'cos_theta':
+                    theta = np.random.uniform(low=0, high=3, size=n)*u.deg.to(u.rad)
+                    axs[i].hist(np.cos(theta), bins=bins[i], density=True, alpha=0.6)
             axs[i].set_title(param)
         axs[0].legend()
         for i, (param, value) in enumerate(aft_params.items()):
             
             if param == 'E0' or param == 'n0':
                 value = np.log10(value)
-            
-            axs[i+6].hist(value, bins=100, density=True, alpha=0.6)
+
+            if j == 0:
+                _, b, _ = axs[i+6].hist(value, bins=100, density=True, alpha=0.6)
+                bins[i+6]= b
+            else:
+                axs[i+6].hist(value, bins=bins[i+6], density=True, alpha=0.6)
             axs[i+6].set_title(param)
 
     # compare to the Zhu paper
-    aft_params = {"E0": [], 
+    aft_params = {"E0": np.log10((10**sts.norm.rvs(loc=49.3, scale=0.4, size=n)) / (1 - np.cos(3*u.deg.to(u.rad)))), 
                     "thetaCore": np.full(n, ((3*u.deg).to(u.rad)).value),
                     "n0": sts.norm.rvs(loc=-2, scale=0.4, size=n),
                     "p": sts.norm.rvs(loc=2.25, scale=0.1, size=n), 
@@ -452,8 +475,11 @@ def lum_func(n, filename, plotname='',
                     #  "epsilon_B": []
                 }
     for i, (param, value) in enumerate(aft_params.items()):
-            axs[i+6].hist(value, bins=100, density=True, alpha=0.6)
-            
+        axs[i+6].hist(value, bins=bins[i+6], density=True, alpha=0.6, label='Zhu+22')
+    axs[6].legend()    
+    axs[3].set_ylim(0, 100)
+    axs[7].set_ylim(0, 100)
+
     # TODO: check how uniform works
     # axs[4].hist(np.cos(sts.uniform.rvs(loc=0, scale=3, size=n)), bins=100, density=True, alpha=0.6)
 
