@@ -25,7 +25,7 @@ from sed_to_lc import SEDDerviedLC, lsst_bands
 from afterglow_addition import AfterglowAddition
 from dns_mass_distribution import Galaudage21, Farrow19
 from monte_carlo_sims import get_ejecta_mass
-from afterglow_params import get_logn0, get_opening_angle, get_loge0, get_p
+from afterglow_params import get_logn0, get_opening_angle, get_loge0, get_p, get_distances
 
 # 10 days out
 idx_10 = np.where(np.isclose(phases, 10.1))[0][0]
@@ -48,19 +48,8 @@ def get_params(n, save=False, filename=''):
         mej_dyns, mej_winds = get_ejecta_mass(mass1, mass2)
         
         # simulate coordinates. Additional term ensures minimum distance of 0.05 Mpc
-        box_size = 600 # increase?
-        x = np.random.uniform(-box_size/2., box_size/2., n)*u.Mpc
-        y = np.random.uniform(-box_size/2., box_size/2., n)*u.Mpc
-        z = np.random.uniform(-box_size/2., box_size/2., n)*u.Mpc
-        #dists = (x**2. + y**2. + z**2.)**0.5 + (0.05*u.Mpc)
-        
-    
-        coords = np.empty(n, dtype=object)
-        dists = np.empty(n, dtype=object)
-        for i in range(n):
-            r, dec, ra = coord.cartesian_to_spherical(x[i], y[i], z[i])
-            coords[i] = coord.SkyCoord(ra=ra, dec=dec)
-            dists[i] = r
+        box_size = 600*u.Mpc
+        coords, dists = get_distances(n, box_size, shape='sphere')
         
         thetaCores = np.deg2rad(get_opening_angle(n, distr='RE23'))
         cos_thetas = np.random.uniform(np.cos(np.deg2rad(30)), 1, size=n) # for EK_aft
@@ -171,7 +160,7 @@ def gen_events(n, save=False, filename=''):
         # edit to use same params as past version
         params = get_params(n, save, filename)
 
-        with schwimmbad.JoblibPool(5) as pool:
+        with schwimmbad.JoblibPool(6) as pool:
              values = list(pool.map(gen_event, params))
 
         with open(f'data/sims/{n}_events_{filename}.pkl', 'wb') as f:
@@ -504,6 +493,26 @@ def afterglows(n, save, filename='', log=False):
     fig.savefig(f'img/{n}_events_{filename}_afts_lsst.png')
     plt.show()
 
+def splitNfix(n, save, filename):
+
+    params = get_params(n, save, filename)
+    _, dists = get_distances(n, 600, shape='sphere')
+
+    for i in range(10):
+
+        p_segment = params[500*i: (500*i)+500]
+        dist_segment = np.array(dists[500*i: (500*i)+500])*u.Mpc 
+        print(len(p_segment))
+
+        # insert the new distances
+        for j, (kn, _) in enumerate(p_segment):
+            kn['dist'] = dist_segment[j]
+
+
+        with open(f'data/sims/{500}_params_{filename}{i+1}.pkl', 'wb') as f:
+                print(f'done params {filename}{i+1}', flush=True)
+                pickle.dump(params, f)        
+
 
 if __name__ == '__main__':
 
@@ -555,11 +564,11 @@ if __name__ == '__main__':
 
     n = args.n_events
     n_files = 10
-    fname = 'refactor'
+    fname = 'truncExt'
     if not args.plot:
         i = args.iter
         print(i, flush=True)
-        np.random.seed(2667 % i)
+        np.random.seed(2667 % i) 
         fname += str(i)
         gen_events(n, save=True, filename=fname)
 

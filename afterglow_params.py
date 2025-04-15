@@ -19,19 +19,19 @@ from matplotlib import gridspec
 
 # load and format Fong et al 2015 CDF for n0
     # assumes e_e = 0.1, e_B = 0.01
-FONG15_N0_FILE = 'data/fong15_n0_eb0.01.csv'
+FONG15_N0_FILE = 'data/fong15_n0_eb0.01_trunc.csv'
 N0_CDF = Table.read(FONG15_N0_FILE, format='csv')
 N0_CDF.sort('n')
 N0_CDF['logn'] = np.log10(N0_CDF['n'])
-CDF_interpolator_N0 = interp1d(N0_CDF['cdf'], N0_CDF['logn'], kind='linear', fill_value='extrapolate')
+CDF_interpolator_N0 = interp1d(N0_CDF['cdf'], N0_CDF['logn'], kind='cubic', fill_value='extrapolate')
 
 # repeat for EK
     # nature paper:https://www.nature.com/articles/s41550-021-01428-7
     # claims afterglowpy is param'd with E_k,iso
-FONG15_EK_FILE = 'data/fong15_ek_eb0.01.csv'
+FONG15_EK_FILE = 'data/fong15_ek_eb0.01_trunc.csv'
 EK_CDF = Table.read(FONG15_EK_FILE, format='csv')
 EK_CDF['logek'] = np.log10(EK_CDF['ek'])
-CDF_interpolator_EK = interp1d(EK_CDF['cdf'], EK_CDF['logek'], kind='linear', fill_value='extrapolate')
+CDF_interpolator_EK = interp1d(EK_CDF['cdf'], EK_CDF['logek'], kind='cubic', fill_value='extrapolate')
 
 # load and format Rouco Escorial et al. 2023 
 RE_THETA_FILE = 'data/RE23_theta_core.csv'
@@ -103,6 +103,9 @@ def get_p(n, distr='Fong15'):
          
 def get_distances(n, length, shape='sphere'):
 
+    u_len = length.unit
+    length = length.value
+
     if shape == 'sphere':
         x1 = np.random.normal(0, 1, n)
         x2 = np.random.normal(0, 1, n)
@@ -110,17 +113,17 @@ def get_distances(n, length, shape='sphere'):
         u = np.random.uniform(0, 1, n)
 
         coef = length*u**(1/3)/np.sqrt(x1**2 + x2**2 + x3**2)
-        x = coef*x1
-        y = coef*x2
-        z = coef*x3
+        x = coef*x1*u_len
+        y = coef*x2*u_len
+        z = coef*x3*u_len
 
     elif shape == 'cube':
-        x = np.random.uniform(-length/2, length/2, n)
-        y = np.random.uniform(-length/2, length/2, n)
-        z = np.random.uniform(-length/2, length/2, n)
+        x = np.random.uniform(-length/2, length/2, n)*u_len
+        y = np.random.uniform(-length/2, length/2, n)*u_len
+        z = np.random.uniform(-length/2, length/2, n)*u_len
 
-    coords = np.zeros(n, dtype=object)
-    dists = np.zeros(n)
+    coords = np.empty(n, dtype=object)
+    dists = np.empty(n, dtype=object)
     for i in range(n):
         r, dec, ra = coord.cartesian_to_spherical(x[i], y[i], z[i])
         coords[i] = coord.SkyCoord(ra=ra, dec=dec)
@@ -161,20 +164,39 @@ def check_params():
     axs = axs.ravel()
 
     # check Fong15 
-    axs[0].plot(N0_CDF['logn'], N0_CDF['cdf'], label='CDF from F15')
+    axs[0].plot(N0_CDF['logn'], N0_CDF['cdf'], label='Trunc CDF from F15')
+
+    # non trunc
+    FONG15_N0_FILE2 = 'data/fong15_n0_eb0.01.csv'
+    N0_CDF2 = Table.read(FONG15_N0_FILE2, format='csv')
+    N0_CDF2.sort('n')
+    N0_CDF2['logn'] = np.log10(N0_CDF2['n'])
+    axs[0].plot(N0_CDF2['logn'], N0_CDF2['cdf'], label='CDF from F15', c='pink')
+
     samples = get_logn0(n)
         # bin up the samples and get cdf
     height, edges, _ = axs[0].hist(samples, density=True, bins=100)
+    axs[0].hist(samples, density=True, bins=edges, cumulative=True, color='gray', alpha=0.5, zorder=-1)
         # cdf = cumulative area of the bins up to a point
     axs[0].plot(edges[1:], np.cumsum(height*np.diff(edges)), 'g--', label='CDF from samples')
+
     axs[0].set_title(r'$n_0$')
 
-    axs[1].plot(EK_CDF['logek'], EK_CDF['cdf'], label='CDF from F15')
+    axs[1].plot(EK_CDF['logek'], EK_CDF['cdf'], label='Trunc CDF from F15')
+
+    # check non trunc
+    FONG15_EK_FILE2 = 'data/fong15_ek_eb0.01.csv'
+    EK_CDF2 = Table.read(FONG15_EK_FILE2, format='csv')
+    EK_CDF2['logek'] = np.log10(EK_CDF2['ek'])
+    axs[1].plot(EK_CDF2['logek'], EK_CDF2['cdf'], label='CDF from F15', c='pink')
+
     samples = get_loge0(n, distr='Fong15')
         # bin up the samples and get cdf
     height, edges, _ = axs[1].hist(samples, density=True, bins=100)
         # cdf = cumulative area of the bins up to a point
+    axs[1].hist(samples, density=True, bins=edges, cumulative=True, color='gray', alpha=0.5, zorder=-1)
     axs[1].plot(edges[1:], np.cumsum(height*np.diff(edges)), 'g--', label='CDF from samples')
+
     axs[1].set_title(r'$E_{\rm K}$')
 
     # Fong et al p distribution
@@ -203,7 +225,7 @@ def check_params():
     for ax in axs:
         ax.legend()
 
-    fig.savefig(f'img/params_check.png')
+    fig.savefig(f'img/params_check_cuml_trunc.png')
     plt.show()
 
 def get_fbeam(n, filename):
@@ -379,13 +401,13 @@ def median_view():
 
 
 if __name__ == '__main__':
-    #pass
+    # pass
     check_params()
 
     #print(get_fbeam(5000, 'e0'), flush=True)
     #cornerplots(5000, 'EK_aft2')
     #median_view()
-    beaming(5000, 'EK_aft2')
+    # beaming(5000, 'EK_aft2')
 
 
 

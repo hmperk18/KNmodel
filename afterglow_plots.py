@@ -568,6 +568,64 @@ def plot_aft_varied(i):
     plt.savefig(f"img/caps/aft_{param_name}_varied.png")
     plt.show()
 
+def comp_Zhu():
+
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+
+    # plot Zhu with +/- 2 sigma in params
+
+    # make the dicts
+    sigmas = {
+        'E0': 0.4**2,
+        'n0': 0.4**2,
+        'p': 0.1**2,
+        'epsilon_e': 0.3**2,
+        'epsilon_B': 0.4**2
+    }
+
+    sigmas_bright = {
+        'E0': 0.5,
+        'n0': 1
+    }
+
+    labels = ['min Zhu', 'typical Zhu', 'max Zhu', 'min bright', 'typical bright', 'max bright']
+    linestyles = [':', '-', '--']*2
+    for i, sig in enumerate([-2, 0, 2]):
+        aft_params_Zhu = {'KN': None,  
+                    'E0': ((10**(49.3 + (sig*sigmas['E0']))) / (1 - np.cos(3*u.deg.to(u.rad)))), 
+                    'thetaCore': 3*u.deg.to(u.rad),
+                    'n0': 10**(-2 + (sig*sigmas['n0'])), 
+                    'p': 2.25 + (sig*sigmas['p']),
+                    'epsilon_e': 10**(-1+ (sig*sigmas['epsilon_e'])),
+                    'epsilon_B': 10**(-3+ (sig*sigmas['epsilon_B'])),
+                    'theta_v':  0.0, 
+                    'coord':  SkyCoord(ra = "13h09m48.08s", dec = "−23deg22min53.3sec"),
+                    'dist': 40*u.Mpc}
+        afterglow_Zhu = AfterglowAddition(**aft_params_Zhu)
+        ax.plot(phases, afterglow_Zhu.getAbsMagsInPassbands(lsst_bands, apply_extinction=False)['lsstg'], 
+            label=labels[i], color='C0', linestyle=linestyles[i])
+
+        aft_params = {'KN': None,  
+                    'E0': 10**(52.5 + (sig*sigmas_bright['E0'])), 
+                    'thetaCore': 0.15,
+                    'n0': 10**(0 + (sig*sigmas_bright['n0'])), 
+                    'p': 2.23,
+                    'epsilon_e': 10**-1,
+                    'epsilon_B': 10**-2, 
+                    'theta_v':  np.arccos(0.99), 
+                    'coord':  SkyCoord(ra = "13h09m48.08s", dec = "−23deg22min53.3sec"),
+                    'dist': 40*u.Mpc}
+        afterglow_bright = AfterglowAddition(**aft_params)
+        ax.plot(phases, afterglow_bright.getAbsMagsInPassbands(lsst_bands, apply_extinction=False)['lsstg'], 
+            label=labels[3+i], color='C1', linestyle=linestyles[3+i])
+
+    ax.invert_yaxis()
+    ax.legend()
+
+    plt.savefig(f"img/caps/aft_compZhu.png")
+
+
+
 # stolen from paper_figs (Shah et al.)
 def makeTrialsEjectaHistogram():
 
@@ -788,11 +846,12 @@ if __name__ == '__main__':
         # plot_stratify(**plt_params)
         # plot_mag_scatter(**plt_params)
 
+        comp_Zhu()
         #compare_GW170817()
         # labels_idx = np.array([4,5])
-        plot_appmag(n*n_files, save=False, filename=fname, plotname=plotname+'_lsst', 
-                            dist=160, limiting_mags=limiting_mags)
-        # # plot_appmag_outlier(n*n_files, save=False, filename=fname, plotname=plotname, 
+        # plot_appmag(n*n_files, save=False, filename=fname, plotname=plotname+'_lsst', 
+        #                     dist=160, limiting_mags=limiting_mags)
+        # # # plot_appmag_outlier(n*n_files, save=False, filename=fname, plotname=plotname, 
         # #                     dist=160, limiting_mags=limiting_mags) # use the data gen'd in the previous plotting
         # #plot_openingAngle(n*n_files, save=False, filename=fname)
         # #makeTrialsEjectaHistogram()
