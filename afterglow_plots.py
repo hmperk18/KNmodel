@@ -821,7 +821,7 @@ if __name__ == '__main__':
 
     n = args.n_events
     n_files = 10
-    fname = 'refactor' # 'All' #'EK_nir' #'EK_red' #
+    fname = 'truncExt' # 'All' #'EK_nir' #'EK_red' #
     plotname=''
     # if not args.plot:
     #     i = args.iter
@@ -836,7 +836,7 @@ if __name__ == '__main__':
         print('now plotting', flush=True)
 
         # select bands for plotting
-        labels_idx = np.array([0, 1, 4, 5, 6, 7, 8, 9]) # UV + LSST
+        # labels_idx = np.array([0, 1, 4, 5, 6, 7, 8, 9]) # UV + LSST
         # labels_idx = np.array([4,5])
         # labels_idx = np.arange(len(labels))
         # font = { 'size'   : 15}
@@ -846,21 +846,21 @@ if __name__ == '__main__':
         # plot_stratify(**plt_params)
         # plot_mag_scatter(**plt_params)
 
-        comp_Zhu()
+        #comp_Zhu()
         #compare_GW170817()
-        # labels_idx = np.array([4,5])
-        # plot_appmag(n*n_files, save=False, filename=fname, plotname=plotname+'_lsst', 
-        #                     dist=160, limiting_mags=limiting_mags)
+        labels_idx = np.array([4,5])
+        plot_appmag(n*n_files, save=False, filename=fname, plotname=plotname+'_lsst', 
+                            dist=160, limiting_mags=limiting_mags)
         # # # plot_appmag_outlier(n*n_files, save=False, filename=fname, plotname=plotname, 
         # #                     dist=160, limiting_mags=limiting_mags) # use the data gen'd in the previous plotting
         # #plot_openingAngle(n*n_files, save=False, filename=fname)
         # #makeTrialsEjectaHistogram()
 
-        # labels_idx = np.array([0,1])
-        # plot_appmag(n*n_files, save=False, filename=fname, plotname=plotname+'_uvex', 
-        #                     dist=160, limiting_mags=limiting_mags)
+        labels_idx = np.array([0,1])
+        plot_appmag(n*n_files, save=False, filename=fname, plotname=plotname+'_uvex', 
+                            dist=160, limiting_mags=limiting_mags)
         
-        # labels_idx = np.array([len(labels)-1-i for i in range(6)])# last 6 is roman/jwst
-        # plot_appmag(n*n_files, save=False, filename=fname, plotname='_clean_jwstromanBianco', 
-        #                     dist=160, limiting_mags=limiting_mags)
+        labels_idx = np.array([len(labels)-1-i for i in range(6)])# last 6 is roman/jwst
+        plot_appmag(n*n_files, save=False, filename=fname, plotname='_clean_jwstromanBianco', 
+                            dist=160, limiting_mags=limiting_mags)
         

@@ -396,14 +396,14 @@ def lum_func(n, filename, plotname='',
 
     params = np.array([a[1] for a in events])
 
-    print(bright_idx, flush=True)
-    M_aftonly = np.min(values[:, 0, 5, :], axis=1)
-    print(len(M_aftonly), flush=True)
-    M_aftonly = M_aftonly[np.isfinite(M_aftonly)]
-    print(len(M_aftonly), flush=True)
-    print('bright g-band afterglows peaks', flush=True)
-    print(M_aftonly[bright_idx], flush=True)
-    params_bright = np.array([a[1] for a in [events[i] for i in bright_idx] ])
+    # print(bright_idx, flush=True)
+    # M_aftonly = np.min(values[:, 0, 5, :], axis=1)
+    # print(len(M_aftonly), flush=True)
+    # M_aftonly = M_aftonly[np.isfinite(M_aftonly)]
+    # print(len(M_aftonly), flush=True)
+    # print('bright g-band afterglows peaks', flush=True)
+    # print(M_aftonly[bright_idx], flush=True)
+    params_bright = np.array([a[1] for a in [events[i] for i in bright_idx]])
 
 
 
@@ -773,7 +773,7 @@ if __name__ == '__main__':
     labels_idx = np.arange(len(labels))
     
     # default is lsst bands 
-    params = {'n': 5000, 'filename': "refactor", 'plotname': "lsstdist"}
+    params = {'n': 5000, 'filename': "truncExt", 'plotname': "lsstdist"}
 
     # print(enhancement_with_volume(**params), flush=True)
 
