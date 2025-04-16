@@ -213,8 +213,8 @@ def enhancement_with_volume(n, filename, plotname='',
                          bands=[4, 5, 6, 7, 8, 9], detection_threshold=[23.8, 24.5, 24.03, 23.41, 22.74, 22.96]):
     
     # params = get_params(n_events, filename=filename)
-    values = gen_events(n, filename=filename) # 10 for now
-    params = get_params(n, filename=filename) #EK_aft
+    events = gen_events(n, filename=filename) # 10 for now
+    # params = get_params(n, filename=filename) #EK_aft
     idx_lsst = bands 
 
     # hold list of discovery windows (time above det)
@@ -227,17 +227,18 @@ def enhancement_with_volume(n, filename, plotname='',
         discovery_window = np.empty(n)  
         afterglow_enhance = np.zeros(n)
 
-        _, dists = get_distances(n, length, shape='sphere')
+        _, dists = get_distances(n, length*u.Mpc, shape='sphere')
 
         # to do: loop over increasing Volume to see how num enhanced changes
 
-        for i, event in enumerate(values):
+        for i, event in enumerate(events):
 
-            kn_p, _ = params[i]
-            dist =  dists[i]*u.Mpc
+            kn_p, _ = event[1] # params second
+            dist =  dists[i]
             distmod = Distance(dist).distmod.value
 
             # convert to app mag
+            event = event[0]
             total = event[1] + distmod
             KN = event[2] + distmod
 
@@ -404,7 +405,6 @@ def lum_func(n, filename, plotname='',
     # print('bright g-band afterglows peaks', flush=True)
     # print(M_aftonly[bright_idx], flush=True)
     params_bright = np.array([a[1] for a in [events[i] for i in bright_idx]])
-
 
 
     legends = ['all events', 'bright']
@@ -775,7 +775,7 @@ if __name__ == '__main__':
     # default is lsst bands 
     params = {'n': 5000, 'filename': "truncExt", 'plotname': "lsstdist"}
 
-    # print(enhancement_with_volume(**params), flush=True)
+    print(enhancement_with_volume(**params), flush=True)
 
     # p_og = get_params(5000, False, 'All')
     # p_new = get_params(5000, False, 'All_noExt')
@@ -784,7 +784,7 @@ if __name__ == '__main__':
     #     print(p_new[i*500], flush=True)
     # print(p_new == p_og, flush=True)
 
-    lum_func(**params)
+    # lum_func(**params)
     # params = {'n': 5000, 'filename': "All_noExt", 'plotname': "lsstdist"}
     # lum_func(**params)
     
