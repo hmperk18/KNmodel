@@ -74,11 +74,25 @@ def get_opening_angle(n, distr='RE23'):
 
     return theta
 
-def get_logn0(n, distr='Fong15'):
+def get_logn0(n, distr='Fong15', loge0=None):
 
     # assumes e_e = 0.1, e_B = 0.01
     if distr == 'Fong15':
         return CDF_interpolator_N0(sts.uniform.rvs(size=n))
+
+    if distr == 'correlated-median':
+        e0 = 10**loge0
+        Ek_52 = e0/1e52
+        n0_med, E0_med = 5.2e-3, 2.9e51/1e52
+
+        return n0_med * (E0_med/Ek_52)**(1/2)
+    
+    if distr == 'correlated-polyfit':
+        # assumes e0 is in ergs, not 10^52 erg
+        m, b = 85.45660381892547, -1.703372420466339
+        return 10**(m*loge0 + b)
+
+
     
 def get_loge0(n, distr='Zhu22', theta_c=None):
     

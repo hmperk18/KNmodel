@@ -565,13 +565,18 @@ if __name__ == '__main__':
 
     n = args.n_events
     n_files = 10
-    fname = 'trunc' #Ext
+    fname = 'mediann0' #'trunc' #Ext
     if not args.plot:
-        i = args.iter
-        print(i, flush=True)
-        np.random.seed(2667 % i) 
-        fname += str(i)
-        gen_events(n, save=True, filename=fname)
+        if args.iter:
+            i = args.iter
+            print(i, flush=True)
+            np.random.seed(2667 % i) 
+            fname += str(i)
+            gen_events(n, save=True, filename=fname)
+        else:
+            i = 1
+            np.random.seed(2667 % i) 
+            gen_events(n, save=True, filename=fname)
 
 
         # TODO: re-run param gen for Ek_aft
