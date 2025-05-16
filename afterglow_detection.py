@@ -13,6 +13,8 @@ from tqdm import tqdm
 import pickle
 import corner
 import os
+import sys
+import argparse
 
 from interpolate_bulla_sed import BullaSEDInterpolator
 from interpolate_bulla_sed import phases
@@ -755,6 +757,15 @@ if __name__ == '__main__':
 
     print('Starting', flush=True)
 
+    argv = sys.argv[1:]
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--n_events', default=500, type=int, required=False, help='number of events')
+    parser.add_argument('--fname', type=str, required=False)
+
+    args = parser.parse_args(args=argv)
+
+
     np.random.seed(1647)
     
     UV_bands = ['UVEX::FUV', 'UVEX::NUV']
@@ -773,9 +784,10 @@ if __name__ == '__main__':
     labels_idx = np.arange(len(labels))
     
     # default is lsst bands 
-    params = {'n': 5000, 'filename': "truncExt", 'plotname': "lsstdist"}
+    n = 10*args.n_events
+    params = {'n': n, 'filename': args.fname, 'plotname': "lsstdist"}
 
-    print(enhancement_with_volume(**params), flush=True)
+    # print(enhancement_with_volume(**params), flush=True)
 
     # p_og = get_params(5000, False, 'All')
     # p_new = get_params(5000, False, 'All_noExt')
@@ -784,7 +796,7 @@ if __name__ == '__main__':
     #     print(p_new[i*500], flush=True)
     # print(p_new == p_og, flush=True)
 
-    # lum_func(**params)
+    lum_func(**params)
     # params = {'n': 5000, 'filename': "All_noExt", 'plotname': "lsstdist"}
     # lum_func(**params)
     

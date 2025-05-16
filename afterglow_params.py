@@ -19,7 +19,7 @@ from matplotlib import gridspec
 
 # load and format Fong et al 2015 CDF for n0
     # assumes e_e = 0.1, e_B = 0.01
-FONG15_N0_FILE = 'data/fong15_n0_eb0.01_trunc.csv'
+FONG15_N0_FILE = 'data/fong15_n0_eb0.01.csv'
 N0_CDF = Table.read(FONG15_N0_FILE, format='csv')
 N0_CDF.sort('n')
 N0_CDF['logn'] = np.log10(N0_CDF['n'])
@@ -28,7 +28,7 @@ CDF_interpolator_N0 = interp1d(N0_CDF['cdf'], N0_CDF['logn'], kind='cubic', fill
 # repeat for EK
     # nature paper:https://www.nature.com/articles/s41550-021-01428-7
     # claims afterglowpy is param'd with E_k,iso
-FONG15_EK_FILE = 'data/fong15_ek_eb0.01_trunc.csv'
+FONG15_EK_FILE = 'data/fong15_ek_eb0.01.csv'
 EK_CDF = Table.read(FONG15_EK_FILE, format='csv')
 EK_CDF['logek'] = np.log10(EK_CDF['ek'])
 CDF_interpolator_EK = interp1d(EK_CDF['cdf'], EK_CDF['logek'], kind='cubic', fill_value='extrapolate')
@@ -85,12 +85,13 @@ def get_logn0(n, distr='Fong15', loge0=None):
         Ek_52 = e0/1e52
         n0_med, E0_med = 5.2e-3, 2.9e51/1e52
 
-        return n0_med * (E0_med/Ek_52)**(1/2)
+        return np.log10(n0_med * (E0_med/Ek_52)**(1/2))
     
     if distr == 'correlated-polyfit':
         # assumes e0 is in ergs, not 10^52 erg
-        m, b = 85.45660381892547, -1.703372420466339
-        return 10**(m*loge0 + b)
+        z = [-1.703372420466339, 85.45660381892547]
+        p = np.poly1d(z)
+        return p(loge0)
 
 
     
@@ -239,8 +240,34 @@ def check_params():
     for ax in axs:
         ax.legend()
 
-    fig.savefig(f'img/params_check_cuml_trunc.png')
+    fig.savefig(f'img/params_check_cuml_correlated.png')
     plt.show()
+
+def check_corr_params():
+
+    n = 100000
+
+    fig, axs = plt.subplots(1, 2, figsize=(16,16))
+    axs = axs.ravel()
+
+    # ek 
+    loge0s = get_loge0(n, distr='Fong15')
+    axs[0].hist(loge0s, bins=100)
+    axs[0].plot(EK_CDF['logek'], EK_CDF['cdf'], label='Trunc CDF from F15')
+
+    n0s_med = get_logn0(n, distr='correlated-median', loge0 = loge0s)
+    n0s_poly = get_logn0(n, distr='correlated-polyfit', loge0 = loge0s)
+    n0s = get_logn0(n, distr='Fong15')
+
+    _, bins, _ = axs[1].hist(n0s_poly, bins=100, alpha=0.5, label='polyfit corr')
+    axs[1].hist(n0s_med, bins = bins, alpha=0.5, label='median corr')
+    axs[1].hist(n0s, bins = bins, alpha=0.5, label='original')
+    axs[1].plot(N0_CDF['logn'], N0_CDF['cdf'], label='Trunc CDF from F15')
+    axs[1].legend()
+
+    fig.savefig(f'img/params_check_corr.png')
+    plt.show()
+
 
 def get_fbeam(n, filename):
 
@@ -416,8 +443,8 @@ def median_view():
 
 if __name__ == '__main__':
     # pass
-    check_params()
-
+    # check_params()
+    check_corr_params()
     #print(get_fbeam(5000, 'e0'), flush=True)
     #cornerplots(5000, 'EK_aft2')
     #median_view()

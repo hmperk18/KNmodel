@@ -89,7 +89,7 @@ def get_params(n, save=False, filename=''):
 
         logE0s = get_loge0(n, distr='Fong15')
         ps = get_p(n, distr='Fong15')
-        logn0s = get_logn0(n, distr='Fong15') #sts.norm.rvs(-2, 0.4**2, size=n)
+        logn0s = get_logn0(n, distr='correlated-polyfit', loge0=logE0s) #sts.norm.rvs(-2, 0.4**2, size=n)
         # fix ee and eb and use n0 distribution
             # e_e = 0.1, e_B = 0.01
         logees = np.full((n,), -1.0) #sts.norm.rvs(-1, 0.3**2, size=n)
@@ -156,10 +156,9 @@ def smooth_out_Nans(lc):
 
 def gen_events(n, save=False, filename=''):
 
-    index = filename[5:] # remove trunc
     if save: 
         # edit to use same params as past version
-        params = get_params(n, False, 'truncExt'+index)
+        params = get_params(n, save, filename)
 
         with schwimmbad.JoblibPool(6) as pool:
              values = list(pool.map(gen_event, params))
@@ -368,17 +367,17 @@ def plot_distance(n, save, filename, limiting_mags):
 def merge(n, n_files, fname):
 
     # join the parameter arrays
-    # params_arr = []
-    # param_files = [f'data/sims/{n}_params_{fname}{i}.pkl' for i in range(1,11)]
-    # for f in param_files:
-    #     with open(f, 'rb') as f:
-    #             params = pickle.load(f)
-    #             params_arr.append(params)
+    params_arr = []
+    param_files = [f'data/sims/{n}_params_{fname}{i}.pkl' for i in range(1,11)]
+    for f in param_files:
+        with open(f, 'rb') as f:
+                params = pickle.load(f)
+                params_arr.append(params)
             
-    # params = np.vstack(params_arr)
-    # print(params.shape, flush=True)
-    # with open(f'data/sims/{n*n_files}_params_{fname}.pkl', 'wb') as f:
-    #     pickle.dump(params, f)
+    params = np.vstack(params_arr)
+    print(params.shape, flush=True)
+    with open(f'data/sims/{n*n_files}_params_{fname}.pkl', 'wb') as f:
+        pickle.dump(params, f)
 
     # join the value arrays
     values_arr = []
@@ -394,21 +393,21 @@ def merge(n, n_files, fname):
         pickle.dump(values, f)
 
     # join the mass arrays
-    # mass_arr = []
-    # mass_files = [f'data/sims/{n}_masses_{fname}{i}.pkl' for i in range(1,11)]
-    # for f in mass_files:
-    #     with open(f, 'rb') as f:
-    #         params = pickle.load(f)
-    #         mass_arr.append(params)
+    mass_arr = []
+    mass_files = [f'data/sims/{n}_masses_{fname}{i}.pkl' for i in range(1,11)]
+    for f in mass_files:
+        with open(f, 'rb') as f:
+            params = pickle.load(f)
+            mass_arr.append(params)
             
-    # masses = np.vstack(mass_arr)
-    # # print(masses.shape, flush=True)
-    # with open(f'data/sims/{n*n_files}_masses_{fname}.pkl', 'wb') as f:
-    #         pickle.dump(masses, f)
+    masses = np.vstack(mass_arr)
+    # print(masses.shape, flush=True)
+    with open(f'data/sims/{n*n_files}_masses_{fname}.pkl', 'wb') as f:
+            pickle.dump(masses, f)
 
     # clean up
-    # for f in val_files: # TODO: put back mass_files + param_files + 
-    #     os.remove(f)
+    for f in mass_files + param_files + val_files: # TODO: put back 
+        os.remove(f)
 
 def compare_GW170817():
     ang = 0.03 # core = 0.07
@@ -523,6 +522,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_events', default=500, type=int, required=False, help='number of events')
     parser.add_argument('--iter', type=int, required=False, help='Filename of simulation results')
     parser.add_argument('--plot', help='If true, plot else iter', action='store_true')
+    parser.add_argument('--fname', type=str, required=False)
 
     args = parser.parse_args(args=argv)
 
@@ -565,7 +565,8 @@ if __name__ == '__main__':
 
     n = args.n_events
     n_files = 10
-    fname = 'mediann0' #'trunc' #Ext
+    # fname = 'mediann0' #'trunc' #Ext
+    fname = args.fname
     if not args.plot:
         if args.iter:
             i = args.iter
