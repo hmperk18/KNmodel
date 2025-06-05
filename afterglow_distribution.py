@@ -25,7 +25,7 @@ from sed_to_lc import SEDDerviedLC, lsst_bands
 from afterglow_addition import AfterglowAddition
 from dns_mass_distribution import Galaudage21, Farrow19
 from monte_carlo_sims import get_ejecta_mass
-from afterglow_params import get_logn0, get_opening_angle, get_loge0, get_p, get_distances
+from afterglow_params import get_logn0, get_opening_angle, get_loge0, get_p, get_distances, get_corr_loge0_logn0
 
 # 10 days out
 idx_10 = np.where(np.isclose(phases, 10.1))[0][0]
@@ -92,6 +92,8 @@ def get_params(n, save=False, filename=''):
         logn0s = get_logn0(n, distr='correlated-polyfit', loge0=logE0s) #sts.norm.rvs(-2, 0.4**2, size=n)
         # fix ee and eb and use n0 distribution
             # e_e = 0.1, e_B = 0.01
+        
+        # logn0s, logE0s = get_corr_loge0_logn0(n, distr='clipped 1')
         logees = np.full((n,), -1.0) #sts.norm.rvs(-1, 0.3**2, size=n)
         logebs = np.full((n,), -2.0) #sts.norm.rvs(-2, 0.4**2, size=n)
 
@@ -153,16 +155,17 @@ def smooth_out_Nans(lc):
     else:
         return lc
 
-
+# TO DO - undo ext mods 
 def gen_events(n, save=False, filename=''):
 
     if save: 
         # edit to use same params as past version
-        params = get_params(n, save, filename)
+        params = get_params(n, False, filename.replace('Polye', 'Polyne')) # fix
 
         with schwimmbad.JoblibPool(6) as pool:
-             values = list(pool.map(gen_event, params))
+             values = list(pool.map(gen_event, params)) # fix
 
+        # filename += 'Ext
         with open(f'data/sims/{n}_events_{filename}.pkl', 'wb') as f:
              pickle.dump(values, f)
 
@@ -406,8 +409,8 @@ def merge(n, n_files, fname):
             pickle.dump(masses, f)
 
     # clean up
-    for f in mass_files + param_files + val_files: # TODO: put back 
-        os.remove(f)
+    # for f in mass_files + param_files + val_files: # TODO: put back 
+    #     os.remove(f)
 
 def compare_GW170817():
     ang = 0.03 # core = 0.07
@@ -514,6 +517,61 @@ def splitNfix(n, save, filename):
                 pickle.dump(params, f)        
 
 
+def plot_extremes_corr():
+
+    fig, axs = plt.subplots(1, 2, figsize=(12,7))
+    axs = axs.ravel()
+
+    band = 'lsstg'
+    params_grb = { # from Troja 2020
+        'E0': 10**52.9,
+        'thetaCore': 0.05,
+        'n0':10**-2.7,
+        'p':2.25,
+        'epsilon_e':10**-1, 
+        'epsilon_B':10**-2.,
+        'coord': SkyCoord(ra = "13h09m48.08s", dec = "−23deg22min53.3sec"),
+        'dist': 40*u.Mpc
+    }
+
+    distr_types = ['gmm', 'gmm1', 'clipped 2', 'clipped 1']
+    for i, d_type in enumerate(distr_types):
+
+        logn0s, logE0s = get_corr_loge0_logn0(5000, distr=d_type)
+
+        ax = axs[0]
+        maxv = np.argmax(logE0s)
+        params_grb['E0'] = 10**(logE0s[maxv])
+        params_grb['n0'] = 10**(logn0s[maxv])
+
+        afterglow = AfterglowAddition(None, **params_grb)
+        mag = afterglow.getAbsMagsInPassbands([band,], apply_extinction=False)
+        ax.plot(phases, mag[band], label=f'{d_type}', color=f'C{i}')
+
+        ax = axs[1]
+        maxv = np.argmax(logn0s)
+        params_grb['E0'] = 10**(logE0s[maxv])
+        params_grb['n0'] = 10**(logn0s[maxv])
+
+        afterglow = AfterglowAddition(None, **params_grb)
+        mag = afterglow.getAbsMagsInPassbands([band,], apply_extinction=False)
+        ax.plot(phases, mag[band], label=f'{d_type}', color=f'C{i}')
+
+        
+    axs[0].set_xlabel('days')
+    axs[0].set_ylabel('M')
+    axs[0].set_title('with Max e0 value')
+    axs[0].invert_yaxis()
+    axs[0].legend()
+    axs[1].set_xlabel('days')
+    axs[1].set_ylabel('M')
+    axs[1].set_title('with Max n0 value')
+    axs[1].invert_yaxis()
+    fig.savefig('img/extremes_.png')
+    plt.show()
+
+
+
 if __name__ == '__main__':
 
     argv = sys.argv[1:]
@@ -598,8 +656,10 @@ if __name__ == '__main__':
                  'size'   : 15}
         matplotlib.rc('font', **font)
 
-        values = gen_events(n*n_files, save=False, filename=fname)
-        print(len(values), len(values[0]), flush=True)
+        # values = gen_events(n*n_files, save=False, filename=fname)
+        # print(len(values), len(values[0]), flush=True)
+
+        # plot_extremes_corr()
 
         # #compare_GW170817()
         #plot(n, save=False, filename=fname)

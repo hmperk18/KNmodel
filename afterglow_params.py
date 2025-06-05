@@ -11,6 +11,7 @@ from astropy.table import Table
 import scipy.stats as sts
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
+from sklearn import mixture
 import pickle
 import corner
 from matplotlib import gridspec
@@ -32,6 +33,18 @@ FONG15_EK_FILE = 'data/fong15_ek_eb0.01.csv'
 EK_CDF = Table.read(FONG15_EK_FILE, format='csv')
 EK_CDF['logek'] = np.log10(EK_CDF['ek'])
 CDF_interpolator_EK = interp1d(EK_CDF['cdf'], EK_CDF['logek'], kind='cubic', fill_value='extrapolate')
+
+# load in e0 n0 from Fong+15 table 3
+FONG15_TABLE3_FILE = 'data/fong15_n0e0_table3.csv'
+data_table3 = pd.read_csv(FONG15_TABLE3_FILE).to_numpy()
+gmm_n0e0 = mixture.GaussianMixture(n_components=2, covariance_type='full').fit(data_table3)
+gmm_n0e01 = mixture.GaussianMixture(n_components=1, covariance_type='full').fit(data_table3)
+
+# load in sigma clipped version
+FONG15_TABLE3_c_FILE = 'data/fong15_n0e0_table3_clipped.csv'
+data_table3_c = pd.read_csv(FONG15_TABLE3_c_FILE).to_numpy()
+gmm_n0e0_c = mixture.GaussianMixture(n_components=2, covariance_type='full').fit(data_table3_c)
+gmm_n0e0_c1 = mixture.GaussianMixture(n_components=1, covariance_type='full').fit(data_table3_c)
 
 # load and format Rouco Escorial et al. 2023 
 RE_THETA_FILE = 'data/RE23_theta_core.csv'
@@ -115,7 +128,53 @@ def get_p(n, distr='Fong15'):
         mean, std = 2.25, 0.1
         pmin, pmax = 2, np.inf
         return sts.truncnorm.rvs(a=(pmin - mean)/std, b=(pmax - mean)/std, loc=mean, scale = std, size=n)
-         
+
+
+def _sample_gaussianMixture(means, covs, weights, n):
+
+    dimensions = len(means)
+
+    # pick which gauss
+    idx = np.random.choice(dimensions, size=n, p=weights)
+
+    # sample from each gauss
+    samples = np.zeros(shape = (n, dimensions))
+    idx_data = 0
+    for i in range(len(means)):
+        mean = means[i]
+        cov = covs[i]
+        n_this_gauss = np.sum(idx == i)
+        s = np.random.multivariate_normal(mean, cov, n_this_gauss)
+        samples[idx_data:idx_data+n_this_gauss] = np.random.multivariate_normal(mean, cov, n_this_gauss)
+        idx_data += n_this_gauss
+
+    return samples
+
+def get_corr_loge0_logn0(n, distr=None):
+
+    if distr == 'clipped 2':
+        gmm = gmm_n0e0_c
+    elif distr== 'clipped 1':
+        gmm = gmm_n0e0_c1
+    elif distr== 'gmm1':
+        gmm = gmm_n0e0
+    else:
+        gmm = gmm_n0e0 # two gaussian all data
+
+    means = gmm.means_
+    covs = gmm.covariances_
+    weights = gmm.weights_
+
+    # sample from the trained gmm 
+    # samples = _sample_gaussianMixture(means, covs, weights, n)
+    samples = gmm.sample(n)[0]
+
+    logn0 = samples[:,0]
+    loge0 = samples[:,1]
+
+    return logn0, loge0
+
+
 def get_distances(n, length, shape='sphere'):
 
     u_len = length.unit
@@ -250,22 +309,40 @@ def check_corr_params():
     fig, axs = plt.subplots(1, 2, figsize=(16,16))
     axs = axs.ravel()
 
-    # ek 
+    logn0, loge0 = get_corr_loge0_logn0(n)
+    _, binse, _ = axs[0].hist(loge0, bins=100, label='gmm', alpha=0.5)
+    _, bins, _ = axs[1].hist(logn0, bins=100, label='gmm', alpha=0.5)
+
+
     loge0s = get_loge0(n, distr='Fong15')
-    axs[0].hist(loge0s, bins=100)
-    axs[0].plot(EK_CDF['logek'], EK_CDF['cdf'], label='Trunc CDF from F15')
+    axs[0].hist(loge0s, bins=binse, label='original')
+    # axs[0].plot(EK_CDF['logek'], EK_CDF['cdf'], label='Trunc CDF from F15')
 
     n0s_med = get_logn0(n, distr='correlated-median', loge0 = loge0s)
     n0s_poly = get_logn0(n, distr='correlated-polyfit', loge0 = loge0s)
     n0s = get_logn0(n, distr='Fong15')
 
-    _, bins, _ = axs[1].hist(n0s_poly, bins=100, alpha=0.5, label='polyfit corr')
-    axs[1].hist(n0s_med, bins = bins, alpha=0.5, label='median corr')
+    axs[1].hist(n0s_poly, bins=bins, alpha=0.5, label='polyfit corr')
+    # axs[1].hist(n0s_med, bins = bins, alpha=0.5, label='median corr')
     axs[1].hist(n0s, bins = bins, alpha=0.5, label='original')
-    axs[1].plot(N0_CDF['logn'], N0_CDF['cdf'], label='Trunc CDF from F15')
-    axs[1].legend()
+    # axs[1].plot(N0_CDF['logn'], N0_CDF['cdf'], label='Trunc CDF from F15')
 
-    fig.savefig(f'img/params_check_corr.png')
+
+    logn0, loge0 = get_corr_loge0_logn0(n, distr='clipped 1')
+    axs[0].hist(loge0, bins=binse, label='gmm clipped 1', alpha=0.5)
+    axs[1].hist(logn0, bins=bins, label='gmm clipped 1', alpha=0.5)
+
+    logn0, loge0 = get_corr_loge0_logn0(n, distr='clipped 2')
+    axs[0].hist(loge0, bins=binse, label='gmm clipped 2', alpha=0.5)
+    axs[1].hist(logn0, bins=bins, label='gmm clipped 2', alpha=0.5)
+
+    logn0, loge0 = get_corr_loge0_logn0(n, distr='gmm1')
+    axs[0].hist(loge0, bins=binse, label='gmm 1', alpha=0.5)
+    axs[1].hist(logn0, bins=bins, label='gmm 1', alpha=0.5)
+
+    axs[0].legend()
+    axs[1].legend()
+    fig.savefig(f'img/params_check_corr_gmm_diffgauss.png')
     plt.show()
 
 
@@ -438,13 +515,12 @@ def median_view():
 
     plt.savefig('img/viewable.png')
 
-    
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
     # pass
     # check_params()
-    check_corr_params()
+    # check_corr_params()
     #print(get_fbeam(5000, 'e0'), flush=True)
     #cornerplots(5000, 'EK_aft2')
     #median_view()
