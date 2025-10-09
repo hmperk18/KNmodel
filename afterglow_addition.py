@@ -48,7 +48,7 @@ class AfterglowAddition():
 
     # defaults to afterglowpy papers fit for Gaussian jet for GRB170817
     def __init__(self, KN, E0=10**52.96, thetaCore=0.066, n0=10**-2.7, p=2.17,
-                 epsilon_e=10**-1.4, epsilon_B=10**-4, 
+                 epsilon_e=10**-1.4, epsilon_B=10**-4, gamma0=None,
                  theta_v = 0.0, coord = None, dist = None, av = 0., rv = 3.1,  # only needed if no KN
                  time = phases, wav = lmbd, addKN = True, xray = False):
         
@@ -91,6 +91,13 @@ class AfterglowAddition():
             'xi_N':        1.0,                # Fraction of electrons accelerated
             'd_L':         10*u.pc.to(u.cm),   # Luminosity distance in cm
         }
+
+        # for finite g0, spreading cannot be used
+        if gamma0 is not None:
+            self.grb_params['g0'] = gamma0
+            self.grb_params['spread'] = False
+            self.grb_params['gammaType'] = grb.jet.GammaEvenMass # appropriate for gaussian jets
+
         self.phases = time # in days
         self.lmbd = wav # in Angstrom - as with Bulla grid
 
@@ -102,30 +109,64 @@ class AfterglowAddition():
             self.sed += self.KNsed
 
     # construct an afterglow SED in the same shape as the KN SED
-    # TODO: add this to a pool? for each frequency of interest
-    def getSed(self):
+    def getSed_old(self):
         Flmbda = np.empty((len(self.nu), len(self.t_s)))
         #print(Flmbda.shape, flush=True)
         for i, n in enumerate(self.nu):
             Fnu = (grb.fluxDensity(self.t_s, n, **self.grb_params)*u.mJy).to(u.erg/u.s/u.cm**2/u.Hz) # gives the flux density in mJy
             Fl = (Fnu*(n**2)/const.c).to(u.erg/u.s/u.cm**2/u.AA)
             Flmbda[i][:] = Fl.value
-
         return np.array(Flmbda).transpose() #+ self.KN.sed
+    
+    # compute all values with one call - should be faster
+    def getSed(self):
+        ts_arr = np.empty((len(self.t_s), len(self.nu)))
+        ts_arr[:, :] = self.t_s[:, None]
+
+        nus_arr = np.empty((len(self.t_s), len(self.nu)))
+        nus_arr[:, :] = self.nu[None, :]
+
+        Fnu = (grb.fluxDensity(ts_arr, nus_arr, **self.grb_params)*u.mJy).to(u.erg/u.s/u.cm**2/u.Hz)
+        Flmbda = (Fnu*(self.nu**2)/const.c).to(u.erg/u.s/u.cm**2/u.AA)
+
+        return np.array(Flmbda).value
+
 
     # from ved, adapted to use the afterglow SED
         # remove False extinction part
-    def getAbsMagsInPassbands(self, passbands, apply_extinction = True, apply_redshift = True): 
+    def getAbsMagsInPassbands(self, passbands, apply_extinction = False, apply_redshift = False): 
 
         lcs = {}
+
+        # add a t=0 row
+        zero_flux_row = np.zeros((1, self.sed.shape[1]))  # shape (1, N_nu)
+
+        # Prepend to sed
+        sed_temp = np.vstack([zero_flux_row, self.sed])  # shape becomes (N_time+1, N_nu)
+
+        # Prepend new phase (must be earlier than current first phase)
+        new_phase = np.array([0.0])  # or something smaller than self.phases[0]
+        new_phase = np.concatenate([new_phase, self.phases])
+
+        print('sed inside the passbands')
+        print(sed_temp.shape, sed_temp.shape, flush=True)
+        print(sed_temp[0], flush=True)
         
         for passband in passbands:
             source_name = f"test_{passband}"
 
             #print(lc_phases.shape, lmbd.shape, self.sed.shape, flush=True)
-            source = sncosmo.TimeSeriesSource(phase=self.phases, wave=self.lmbd, flux = self.sed, name=source_name, zero_before=True)
+            
+            source = sncosmo.TimeSeriesSource(phase=new_phase, wave=self.lmbd, flux = sed_temp, name=source_name, zero_before=True)
+
 
             model = sncosmo.Model(source)
+            # abs_mags = model.bandmag(band=passband, time = new_phase, magsys="ab")
+            # abs_flux = model.bandflux(band=passband, time = new_phase, zpsys='ab', zp=25.)
+            # print(f'before effects {passband}', flush=True)
+            # print(abs_mags, flush=True)
+            # print(abs_flux, flush=True)
+        
             # print(apply_extinction, flush=True)
             # print(model, flush=True)
             if apply_extinction:
@@ -144,8 +185,15 @@ class AfterglowAddition():
                 # Adding redshift based on distance: https://docs.astropy.org/en/stable/api/astropy.coordinates.Distance.html#astropy.coordinates.Distance.z
                 z = self.distance.z
                 model.set(z=z)
+                # print(model, flush=True)
 
             abs_mags = model.bandmag(band=passband, time = self.phases, magsys="ab")
+            # abs_flux = model.bandflux(band=passband, time = self.phases, zpsys='ab', zp=25.)
+            # print(f'inside the abs mag func {passband}', flush=True)
+            # print(abs_mags.shape, flush=True)
+            # print(abs_mags, flush=True)
+            # print(abs_flux, flush=True)
+
             lcs[passband] = abs_mags
 
         return lcs
@@ -389,7 +437,9 @@ if __name__ == "__main__":
         plt.xscale('log')
         fig.savefig('img/compare.png')
         plt.show()
+    
     # call stuff here
+
     #compareWithFile()
 
     #GW170817 object

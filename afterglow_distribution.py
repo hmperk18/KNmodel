@@ -87,13 +87,13 @@ def get_params(n, save=False, filename=''):
         # logees = np.random.normal(-1, 0.3**2, n)
         # logebs = np.random.normal(-2, 0.4**2, n)
 
-        logE0s = get_loge0(n, distr='Fong15')
+        logE0s = get_loge0(n, distr='Zhu22')
         ps = get_p(n, distr='Fong15')
-        logn0s = get_logn0(n, distr='correlated-polyfit', loge0=logE0s) #sts.norm.rvs(-2, 0.4**2, size=n)
+        logn0s = get_logn0(n, distr='Zhu22') #sts.norm.rvs(-2, 0.4**2, size=n)
         # fix ee and eb and use n0 distribution
             # e_e = 0.1, e_B = 0.01
         
-        # logn0s, logE0s = get_corr_loge0_logn0(n, distr='clipped 1')
+        # logn0s, logE0s = get_corr_loge0_logn0(n) #, distr='clipped 1'
         logees = np.full((n,), -1.0) #sts.norm.rvs(-1, 0.3**2, size=n)
         logebs = np.full((n,), -2.0) #sts.norm.rvs(-2, 0.4**2, size=n)
 
@@ -110,9 +110,9 @@ def get_params(n, save=False, filename=''):
             print(f'done params {filename}', flush=True)
             pickle.dump(params, f)
         #np.savetxt(f"{n}_events.csv", params, delimiter=",")
-        with open(f'data/sims/{n}_masses_{filename}.pkl', 'wb') as f:
-            print(f'done masses {filename}', flush=True)
-            pickle.dump(masses, f)
+        # with open(f'data/sims/{n}_masses_{filename}.pkl', 'wb') as f:
+        #     print(f'done masses {filename}', flush=True)
+        #     pickle.dump(masses, f)
     else:
         # load in the values
         with open(f'data/sims/{n}_params_{filename}.pkl', 'rb') as f:
@@ -131,6 +131,7 @@ def gen_event(params):
 
     mag_band_aft = afterglow.getAbsMagsInPassbands(sncosmo_bands)
     mag_band_aft = np.array([list(item) for item in mag_band_aft.values()])
+    print(mag_band_aft[:, 0], flush=True) # rm
     afterglow.sed += afterglow.KNsed # add the KN on top
 
     # get the diff and save those
@@ -156,11 +157,15 @@ def smooth_out_Nans(lc):
         return lc
 
 # TO DO - undo ext mods 
-def gen_events(n, save=False, filename=''):
+def gen_events(n, save=False, filename='', pfilename=None):
 
     if save: 
         # edit to use same params as past version
-        params = get_params(n, False, filename.replace('Polye', 'Polyne')) # fix
+        if pfilename is None:
+            params = get_params(n, save, filename) # fix. filename.replace('z', 'n')
+        else:
+            # if specified use the parameters from a different file
+            params = get_params(n, False, pfilename)
 
         with schwimmbad.JoblibPool(6) as pool:
              values = list(pool.map(gen_event, params)) # fix
@@ -370,21 +375,21 @@ def plot_distance(n, save, filename, limiting_mags):
 def merge(n, n_files, fname):
 
     # join the parameter arrays
-    params_arr = []
-    param_files = [f'data/sims/{n}_params_{fname}{i}.pkl' for i in range(1,11)]
-    for f in param_files:
-        with open(f, 'rb') as f:
-                params = pickle.load(f)
-                params_arr.append(params)
+    # params_arr = []
+    # param_files = [f'data/sims/{n}_params_{fname}{i}.pkl' for i in range(1,n_files+1)]
+    # for f in param_files:
+    #     with open(f, 'rb') as f:
+    #             params = pickle.load(f)
+    #             params_arr.append(params)
             
-    params = np.vstack(params_arr)
-    print(params.shape, flush=True)
-    with open(f'data/sims/{n*n_files}_params_{fname}.pkl', 'wb') as f:
-        pickle.dump(params, f)
+    # params = np.vstack(params_arr)
+    # # print(params.shape, flush=True)
+    # with open(f'data/sims/{n*n_files}_params_{fname}.pkl', 'wb') as f:
+    #     pickle.dump(params, f)
 
     # join the value arrays
     values_arr = []
-    val_files = [f'data/sims/{n}_events_{fname}{i}.pkl' for i in range(1,11)]
+    val_files = [f'data/sims/{n}_events_{fname}{i}.pkl' for i in range(1,n_files+1)]
     for f in val_files:
         with open(f, 'rb') as f:
             values = pickle.load(f)
@@ -396,17 +401,17 @@ def merge(n, n_files, fname):
         pickle.dump(values, f)
 
     # join the mass arrays
-    mass_arr = []
-    mass_files = [f'data/sims/{n}_masses_{fname}{i}.pkl' for i in range(1,11)]
-    for f in mass_files:
-        with open(f, 'rb') as f:
-            params = pickle.load(f)
-            mass_arr.append(params)
+    # mass_arr = []
+    # mass_files = [f'data/sims/{n}_masses_{fname}{i}.pkl' for i in range(1,n_files+1)]
+    # for f in mass_files:
+    #     with open(f, 'rb') as f:
+    #         params = pickle.load(f)
+    #         mass_arr.append(params)
             
-    masses = np.vstack(mass_arr)
-    # print(masses.shape, flush=True)
-    with open(f'data/sims/{n*n_files}_masses_{fname}.pkl', 'wb') as f:
-            pickle.dump(masses, f)
+    # masses = np.vstack(mass_arr)
+    # # # print(masses.shape, flush=True)
+    # with open(f'data/sims/{n*n_files}_masses_{fname}.pkl', 'wb') as f:
+    #         pickle.dump(masses, f)
 
     # clean up
     # for f in mass_files + param_files + val_files: # TODO: put back 
@@ -571,6 +576,20 @@ def plot_extremes_corr():
     plt.show()
 
 
+def add_gamma0_parameters(n, filename, pfilename, gamma0=None):
+
+    # load in the parameters to update
+    params = get_params(n, False, filename)
+
+    for param in params:
+        aft = param[1]
+        # add gamma0
+        aft['gamma0'] = gamma0
+
+    # save with the new name
+    with open(f'data/sims/{n}_params_{pfilename}.pkl', 'wb') as f:
+             pickle.dump(params, f)
+
 
 if __name__ == '__main__':
 
@@ -581,6 +600,7 @@ if __name__ == '__main__':
     parser.add_argument('--iter', type=int, required=False, help='Filename of simulation results')
     parser.add_argument('--plot', help='If true, plot else iter', action='store_true')
     parser.add_argument('--fname', type=str, required=False)
+    parser.add_argument('--pfname', type=str, required=False, default=None)
 
     args = parser.parse_args(args=argv)
 
@@ -625,17 +645,25 @@ if __name__ == '__main__':
     n_files = 10
     # fname = 'mediann0' #'trunc' #Ext
     fname = args.fname
+    pfname = args.pfname
     if not args.plot:
         if args.iter:
             i = args.iter
-            print(i, flush=True)
-            np.random.seed(2667 % i) 
+            
             fname += str(i)
+            seed_new = hash(f"{fname}") % 2**32
+            np.random.seed(seed_new)
+
+            
             gen_events(n, save=True, filename=fname)
+            print(f'done {fname}, seed {seed_new}', flush=True)
         else:
             i = 1
-            np.random.seed(2667 % i) 
-            gen_events(n, save=True, filename=fname)
+            # np.random.seed(2667 % i)
+
+            if pfname is not None:
+                add_gamma0_parameters(n, fname, pfname, gamma0=100)
+            gen_events(n, save=True, filename=pfname, pfilename=pfname)
 
 
         # TODO: re-run param gen for Ek_aft
@@ -645,16 +673,37 @@ if __name__ == '__main__':
         # done - now check that these are the correct ones, then save the masses
 
     if args.plot:
+        print(f'merging {fname} now', flush=True)
         merge(n, n_files=n_files, fname=fname)
-        print('now plotting', flush=True)
+        # print('now plotting', flush=True)
 
         # select bands for plotting
         # labels_idx = np.array([0, 1, 4, 5, 6, 7, 8, 9]) # UV + LSST
         # labels_idx = np.array([0,1])
-        labels_idx = np.arange(len(labels))
-        font = {'family' : 'normal',
-                 'size'   : 15}
-        matplotlib.rc('font', **font)
+        # labels_idx = np.arange(len(labels))
+
+
+        # kn_p = {'mej_dyn': 0.004321779762824195, 
+        #     'mej_wind': 0.04182826654986341, 
+        #     'phi': 16.08937008294327, 
+        #     'cos_theta': 0.9575188803585961, 
+        #     'dist': 587.88021042*u.Mpc, 
+        #     'coord': SkyCoord(ra = 315.77266398*u.deg, dec =  5.85190817*u.deg),
+        #     'av': 0.5505275977803256, 
+        #     'rv': 3.1}
+        # aft_p = {'E0': 5.467852735022001e+52, 
+        #     'thetaCore': 0.06303483850999154, 
+        #     'n0': 4.211736092225102e-05, 
+        #     'p': 2.4813287049836688, 
+        #     'epsilon_e': 0.09999999999999999, 
+        #     'epsilon_B': 0.01}
+
+        # gen_event((kn_p, aft_p))
+
+
+        # font = {'family' : 'normal',
+        #          'size'   : 15}
+        # matplotlib.rc('font', **font)
 
         # values = gen_events(n*n_files, save=False, filename=fname)
         # print(len(values), len(values[0]), flush=True)
@@ -664,7 +713,7 @@ if __name__ == '__main__':
         # #compare_GW170817()
         #plot(n, save=False, filename=fname)
         # #afterglows(n*n_files, save=False, filename=fname)
-        plot_avglc(n*n_files, save=False, filename=fname)
+        # plot_avglc(n*n_files, save=False, filename=fname)
         #plot_color(n, save=False, filename=fname)
         #plot_distance(n*n_files, save=False, filename=fname, limiting_mags=sncosmo_lim_mags)
     # params = get_params(500, False, filename=fname)

@@ -7,6 +7,7 @@ from matplotlib.cm import ScalarMappable
 import matplotlib.ticker as ticker
 from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import pandas as pd
 # plt.rcParams['text.usetex'] = True
 # plt.style.use('./redback.mplstyle')
 
@@ -777,6 +778,63 @@ def plot_3D_SED():
     # Z = mag_band_aftKN - mag_band_KN # magnitude enhancement
 
     
+def plot_color_v_angle(n, filename, plotname=''):
+    events = gen_events(n, False, filename)
+    values = np.array([a[0] for a in events])
+    params = np.array([a[1] for a in events])
+
+    fig, axs = plt.subplots(3,2, figsize=(12,6))
+    axs = axs.ravel()
+
+    # get color at 1 and 5 days post-merger
+    idx_1 = np.where(np.isclose(phases, 1.0))[0][0]
+    idx_5 = np.where(np.isclose(phases, 5.0))[0][0]
+    assert np.isclose(phases[idx_1], 1.0)
+    assert np.isclose(phases[idx_5], 5.0)
+
+    uband = 4
+    rband = 6
+
+    datas = []
+    for vs, ps in zip(values, params):
+        color_1_kn = vs[2, uband, idx_1] - vs[2, rband, idx_1]
+        color_5_kn = vs[2,uband, idx_5] - vs[2, rband, idx_5]
+        color_1_total = vs[1, uband, idx_1] - vs[1, rband, idx_1]
+        color_5_total = vs[1, uband, idx_5] - vs[1, rband, idx_5]
+
+        thetaCore = ps['thetaCore']
+        theta_view = np.arccos(ps['cos_theta'])
+        v_c = theta_view / thetaCore
+
+        datas.append(
+            {
+                'color_1_kn': color_1_kn,
+                'color_5_kn': color_5_kn,
+                'color_1_total': color_1_total,
+                'color_5_total': color_5_total,
+                'thetaCore': thetaCore,
+                'theta_view': theta_view,
+                'v_c': v_c
+            }
+        )
+    data_df = pd.DataFrame(datas)
+
+    # 6 plots, column 0 
+    for i in range(3):
+        ax = axs[i]
+        ax.scatter(data_df['v_c'], data_df['color_1_kn'], color='C0', alpha=0.5)
+        ax.scatter(data_df['v_c'], data_df['color_1_total'], color='C1', alpha=0.5)
+
+        ax2 = axs[i+3]
+        ax2.scatter(data_df['v_c'], data_df['color_5_kn'], color='C0', alpha=0.5)
+        ax2.scatter(data_df['v_c'], data_df['color_5_total'], color='C1', alpha=0.5)
+
+    fig.tight_layout()
+    fig.savefig(f'img/caps/{n}_events_{filename}{plotname}_colorVangle.png')
+    plt.show() 
+
+
+
 if __name__ == '__main__':
 
     argv = sys.argv[1:]

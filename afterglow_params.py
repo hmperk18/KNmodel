@@ -106,14 +106,18 @@ def get_logn0(n, distr='Fong15', loge0=None):
         p = np.poly1d(z)
         return p(loge0)
 
+    if distr == 'Zhu22':
+        logn0 = sts.norm.rvs(-2, 0.4)
+
+        return logn0
 
     
-def get_loge0(n, distr='Zhu22', theta_c=None):
+def get_loge0(n, distr='Zhu22', cos_thetas=None):
     
     if distr == 'Zhu22':
         logEj =  sts.norm.rvs(49.3, 0.4, size=n)
         # E0 = Ej / 1-cos theta -> logE0 = logEj - log(1-cos theta)
-        return logEj - np.log10(1 - np.cos(theta_c))
+        return logEj - np.log10(1 - cos_thetas)
     
     # assumes e_e = 0.1, e_B = 0.01
     if distr == 'Fong15':
